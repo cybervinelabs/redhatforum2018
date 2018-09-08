@@ -1,0 +1,9 @@
+apiVersion: servicecatalog.k8s.io/v1beta1
+kind: ServiceBinding
+metadata:
+  name: rhforum-cosmosdb-binding
+  namespace: default
+spec:
+  instanceRef:
+    name: rhforum-cosmosdb
+  secretName: rhforum-cosmosdb-secret

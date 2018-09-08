@@ -1,0 +1,9 @@
+apiVersion: servicecatalog.k8s.io/v1beta1
+kind: ServiceBinding
+metadata:
+  name: rhforum-sql-binding
+  namespace: default
+spec:
+  instanceRef:
+    name: rhforum-sql-instance
+  secretName: rhforum-sql-secret
