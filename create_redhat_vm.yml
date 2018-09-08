@@ -1,0 +1,110 @@
+- name: Create Azure VM
+  hosts: localhost
+  vars:
+    resource_group: Ansible
+    network_security_group: myNetworkSecurityGroup
+    vnet_name: rhfvNet
+    vnet_network: 10.0.0.0/16
+    vnet_subnet_name: rhfSubnet
+    vnet_subnet: 10.0.1.0/24
+    public_name: rhfPublicIP
+    dns_prefix: redhatforum2018
+    nic_name: rhfNIC
+    vm_name: rhfVM
+    vm_size: Standard_D4s_v3
+    admin_username: grantv
+    ssh_password_enabled: false
+    ssh_public_keys_path: /home/grantv/.ssh/authorized_keys
+    ssh_key_data: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDFjbCudWxXLXpRvu4oFwtIKzXhMbCjmLhSBD+UFxuu4KojJ5ZsEzbR2Ih3241K9VUPA+QAr7Du03L5oFogcCv1VouMc6pJJqtIAdSAIgcxC7TbGkm/cRAb+9Lgg9QmI4xdsRu0SKzknz5ne0aEwVxga+pFuEDJ+kNU61QY/D0pcmxx42/01aYODHa0z9dHDXhPZVkP/TRO/RP79KVf6/uAFPdZucgMF1zmd49xZ2x2A2aSrljIt3nrnDqPVlWAvAn/iwgCsfEDpWXbsko74/H4KqDgS3s6ii1nh6Tf6CzIivMiW2tv3nbRHh7ALqc7qZTPGvVrBcGr59qdK9OGzYUd grantv@Grants-MBP
+    image:
+        offer: RHEL
+        publisher: RedHat
+        sku: '7.3'
+        version: latest
+  connection: local
+  tasks:
+  - name: Create virtual network
+    azure_rm_virtualnetwork:
+      resource_group: "{{ resource_group }}"
+      name: "{{ vnet_name }}"
+      address_prefixes: "{{ vnet_network }}"
+    register: vnetDetails
+  - name: vNet creation output
+    debug:
+      msg: "vNet with name {{ vnetDetails.state.name }} has a provisioning status of {{ vnetDetails.state.provisioning_state }}."
+  - name: Add subnet
+    azure_rm_subnet:
+      resource_group: "{{ resource_group }}"
+      name: "{{ vnet_subnet_name }}"
+      address_prefix: "{{ vnet_subnet }}"
+      virtual_network: "{{ vnetDetails.state.name }}"
+    register: subnetDetails
+  - name: Subnet creation output
+    debug:
+      msg: "Subnet with name {{ subnetDetails.state.name }} has a provisioning status of {{ subnetDetails.state.provisioning_state }}."
+  - name: Create Public IP address
+    azure_rm_publicipaddress:
+      resource_group: "{{ resource_group }}"
+      allocation_method: Static
+      name: "{{ public_name }}"
+      domain_name: "{{ dns_prefix }}"
+    register: public_ip_address
+  - name: Dump public IP for VM which will be created
+    debug:
+      msg: "The first public IP is {{ public_ip_address.state.ip_address }} and has a provisioning status of {{ public_ip_address.state.provisioning_state }}."
+  - name: Create Network Security Group that allows SSH and MSSQL
+    azure_rm_securitygroup:
+      resource_group: "{{ resource_group }}"
+      name: "{{ network_security_group }}"
+      rules:
+        - name: SSH
+          protocol: Tcp
+          destination_port_range: 22
+          access: Allow
+          priority: 1001
+          direction: Inbound
+        - name: MSSQL
+          protocol: Tcp
+          destination_port_range: 1433
+          access: Allow
+          priority: 1002
+          direction: Inbound
+    register: nsgDetails
+  - name: Network Security Group creation output
+    debug:
+      msg: "NSG with name {{ nsgDetails.state.name }} has been created."
+  - name: Create virtual network interface card
+    azure_rm_networkinterface:
+      resource_group: "{{ resource_group }}"
+      name: "{{ nic_name }}"
+      virtual_network: "{{ vnetDetails.state.name }}"
+      subnet: "{{ subnetDetails.state.name }}"
+      security_group: "{{ nsgDetails.state.name }}"
+      ip_configurations:
+      - name: ipconfig1
+        public_ip_address_name: "{{ public_ip_address.state.name }}"
+        primary: True
+    register: nicDetails
+  - name: NIC creation output
+    debug:
+      msg: "NIC with name {{ nicDetails.state.name }} has a provisioning status of {{ nicDetails.state.provisioning_state }}."
+  - name: Create VM
+    azure_rm_virtualmachine:
+      resource_group: "{{ resource_group }}"
+      name: "{{ vm_name }}"
+      vm_size: "{{ vm_size }}"
+      admin_username: "{{ admin_username }}"
+      ssh_password_enabled: "{{ ssh_password_enabled }}"
+      ssh_public_keys:
+        - path: "{{ ssh_public_keys_path }}"
+          key_data: "{{ ssh_key_data }}"
+      network_interfaces: "{{ nicDetails.state.name }}"
+      image:
+        offer: "{{ image.offer }}"
+        publisher: "{{ image.publisher }}"
+        sku: "{{ image.sku }}"
+        version: "{{ image.version }}"
+    register: vmDetails
+  - name: Output VM details
+    debug:
+      msg: "VM with name {{ vmDetails.ansible_facts.azure_vm.name }} has been created."

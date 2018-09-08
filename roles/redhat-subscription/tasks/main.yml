@@ -1,0 +1,10 @@
+---
+
+# Register for Redhat Subscription
+
+- name: Subscribe to a specific Pool
+  redhat_subscription:
+    state: present
+    activationkey: "{{ redhat_activation }}"
+    org_id: "{{ redhat_org_id }}"
+    pool: '^(Red Hat Enterprise Server)$'

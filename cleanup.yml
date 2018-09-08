@@ -1,0 +1,46 @@
+- name: Cleanup VMs
+  hosts: localhost
+  vars:
+    resource_group: Ansible
+    network_security_group: myNetworkSecurityGroup
+    vnet_name: rhfvNet
+    vnet_subnet_name: rhfSubnet
+    public_name: rhfPublicIP
+    nic_name: rhfNIC
+    vm_name: rhfVM
+  connection: local
+  tasks:
+  - name: Cleanup Azure VM
+    azure_rm_virtualmachine:
+      resource_group: "{{ resource_group }}"
+      state: absent
+      name: "{{ vm_name }}"
+      # ignore_errors: yes
+      remove_on_absent:
+        - virtual_storage
+  - name: Remove virtual network interface card
+    azure_rm_networkinterface:
+      resource_group: "{{ resource_group }}"
+      name: "{{ nic_name }}"
+      state: absent
+  - name: Remove Network Security Group that allows SSH and MSSQL
+    azure_rm_securitygroup:
+      resource_group: "{{ resource_group }}"
+      name: "{{ network_security_group }}"
+      state: absent
+  - name: Remove Public IP address
+    azure_rm_publicipaddress:
+      resource_group: "{{ resource_group }}"
+      name: "{{ public_name }}"
+      state: absent
+  - name: Remove subnet
+    azure_rm_subnet:
+      resource_group: "{{ resource_group }}"
+      name: "{{ vnet_subnet_name }}"
+      virtual_network: "{{ vnet_name }}"
+      state: absent
+  - name: Remove virtual network
+    azure_rm_virtualnetwork:
+      resource_group: "{{ resource_group }}"
+      name: "{{ vnet_name }}"
+      state: absent
